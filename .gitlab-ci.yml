@@ -12,6 +12,19 @@ stages:
 - release-prepare
 - deploy_dev
 
+complex-logic:
+    config:
+      threshold: 10
+  file-lines:
+    config:
+      threshold: 500
+  method-complexity:
+    config:
+      threshold: 10
+  method-lines:
+    config:
+      threshold: 250
+
 before_script:
 - docker login $REGISTRY  -u $REGISTRY_USER -p $REGISTRY_USER_PASSWORD
 
