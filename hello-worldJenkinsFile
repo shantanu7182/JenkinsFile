@@ -1,237 +1,243 @@
-def alf secrets = [
-
-[path: 'kv2/jenkins-wip/devops/alf', engineVersion: 2, secretValues: [
-
-        [envVar: 'AQUA_READ_USR', vaultKey: 'AQUA READ_USR'],
-        [envVar: 'AQUA READ_PSW', vaultKey: 'AQUA_READ_PSW'],
-        [envVar: 'STAGING_UPDATE USR', vaultKey: 'STAGING_UPDATE_USR'],
-        [envVar: 'STAGING_UPDATE_PSW', vaultKey: 'STAGING_UPDATE_PSW'),
-        [envVar: 'SONAR TOKEN', vaultKey: 'SONAR TOKEN']
+def alf_secrets = [
+    [path: 'kv2/jenkins-wip/devops/alf', engineVersion: 2, secretValues: [
+        [envVar: 'AQUA_READ_USR', vaultKey: 'AQUA_READ_USR'],
+        [envVar: 'AQUA_READ_PSW', vaultKey: 'AQUA_READ_PSW'],
+        [envVar: 'STAGING_UPDATE_USR', vaultKey: 'STAGING_UPDATE_USR'],
+        [envVar: 'STAGING_UPDATE_PSW', vaultKey: 'STAGING_UPDATE_PSW'],
+        [envVar: 'SONAR_TOKEN', vaultKey: 'SONAR_TOKEN']
     ]]
 ]
 
-
-
-def osg secrets = [
-
+def osg_secrets = [
     [path: 'kv2/jenkins-wip/devops/osg', engineVersion: 2, secretValues: [
-        [envVar: 'IQ READ_USR', vaultKey: 'IQ_READ_USR'],
-        [envVar: 'IQ READ_PSW', vaultKey: 'IQ_READ_PSW']
-]]
+        [envVar: 'IQ_READ_USR', vaultKey: 'IQ_READ_USR'],
+        [envVar: 'IQ_READ_PSW', vaultKey: 'IQ_READ_PSW']
+    ]]
+]
 
-pipeline (
-
+pipeline {
     agent {
-
         kubernetes {
             inheritFrom 'alf-base alf-img alf-java'
-                    }
         }
     }
 
-environment {
-
-    IMG env.GIT_URL.replaceAll('https://ghe.service.group/', '').replaceAll('.git','').toLowerCase().replaceAll('/','-')
+    environment {
+        IMG = env.GIT_URL.replaceAll('https://ghe.service.group/', '').replaceAll('.git', '').toLowerCase().replaceAll('/', '-')
         TAG = "${GIT_COMMIT[0..7]}"
-        IQ APP OUT = 'iqappout.json'
-        IQ APP_TRACE = 'iqtraceappout.txt'
-        IQ IMAGE_OUT = 'iqimageout.json'
-        IQ IMAGE TRACE = 'iqtraceimageout.txt'
-        AQ IMAGE_OUT = 'aqout.json'
-        SONAR HOST = "https://$SONAR SERVER"
-        IQ HOST = "https://$IQ_SERVER"
-        IQ STAGE = 'build'
-        AQUA_HOST = "https://$AQUA_SERVER"
-        AQUA SCAN "SAOUA HOST/#/images/H%20Scans/"
-        }
-
-stages {
-
-    stage("Build') {
-        steps (
-            container('maven') (
-                sh '''
-                mvns project-settings.xml              \
-                -B-Djavax.net.ssl.trustStore=cacerts   \
-                -U-Dmaven.test.skip=true                \
-                clean compile
-                 '''
-                }
-            }
-        }
-
-stage('Unit Test and Package') {
-
-        steps {
-        container('maven') {
-        sh '''
-            mvn -s project-settings.xml
-                -B-Djavax.net.ssl.trustStore=cacerts
-            package
-        '''
-        }
+        IQ_APP_OUT = 'iqappout.json'
+        IQ_APP_TRACE = 'iqtraceappout.txt'
+        IQ_IMAGE_OUT = 'iqimageout.json'
+        IQ_IMAGE_TRACE = 'iqtraceimageout.txt'
+        AQ_IMAGE_OUT = 'aqout.json'
+        SONAR_HOST = "https://${SONAR_SERVER}"
+        IQ_HOST = "https://${IQ_SERVER}"
+        IQ_STAGE = 'build'
+        AQUA_HOST = "https://${AQUA_SERVER}"
+        AQUA_SCAN_URL = "https://${AQUA_HOST}/#/images/H%20Scans/"
     }
-   } 
 
-stage("Sonar') {
+    stages {
 
+        stage("Build") {
             steps {
                 container('maven') {
-                withSonarQubeEnv (env. SONAR SERVER) (
-            sh """
-                curl -k0 https://nexus.alf.uk/repository/binaries/lbg-ca-support/cacerts
-                mvn -s project-settings.xml -X          \
-                -B -Djavax.net.ssl.trustStore=cacerts   \
-                -Dsonar.host.url-$SONAR_HOST            \
-                sonar: sonar
-                """
-                }
-            }
-            timeout(time: 3, RUTES) {
-                echo waiting for SonarQube result...!
-                script
-                sh sleep 15
-                def result = waitFor QualityGate()
-                if (result.status to 10K) {
-                    error "Quality gate falled with results (result.status)"
-                }
-                else{
-                    echo "Quality gate passed with result: $(result.status)"
+                    sh '''
+                        mvn -s project-settings.xml \
+                        -B -Djavax.net.ssl.trustStore=cacerts \
+                        -U -Dmaven.test.skip=true \
+                        clean compile
+                    '''
                 }
             }
         }
-    }
-}
 
-                stage Image Build') {
-                    environment {
-                        PATH"hank
-                steps {
-                    container(name: 'kaniko', shells: '/busybox/sh') {
-                    sh """#!/busybox/sh
-                        /kaniko/executor --contest 'pwd' --verbosity info --no-push --destination image --tarPath $KANIKO_OUT_TAR
-                    """
+        stage("Unit Test and Package") {
+            steps {
+                container('maven') {
+                    sh '''
+                        mvn -s project-settings.xml \
+                        -B -Djavax.net.ssl.trustStore=cacerts \
+                        package
+                    '''
+                }
+            }
+        }
+
+        stage("Sonar") {
+            steps {
+                container('maven') {
+                    withSonarQubeEnv("${SONAR_SERVER}") {
+                        sh '''
+                            curl -k -o cacerts https://nexus.alf.uk/repository/binaries/lbg-ca-support/cacerts
+                            mvn -s project-settings.xml \
+                            -B -Djavax.net.ssl.trustStore=cacerts \
+                            -Dsonar.host.url=${SONAR_HOST} \
+                            sonar:sonar
+                        '''
                     }
                 }
             }
-            stage('Security Scans') {
-            parallel{
-                stage('IQ App Scan') {
-                steps{
-                    container('maven') {
-                        withVault([vaultSecrets: osg_secrets]) {
-                            sh"""
-                                mvn -s project-settings.xml             \
-                                -Djavax.net.ssl.trustStore=cacerts      \
-                                -Dclm.resultFile=SIQ_APP_OUT             \
-                                -Dclm.username=$IQ_READ_USR                \
-                                -Dclm.password=$IQ_READ_PSW                 \
-                                -Dclm.serverUrl=SIQ_HOST                    \
-                                -Dclm.applicationId=$IMG                    \
-                                package com.sonatype.clm:clm-maven-plugin: evaluate
-                                | tee $IQ APP_TRACE
-                            """
-                   }
-                }
-            }
-       }                    
-                    stage('IQ Image Scan') {
-                        steps {
-                        container('util') {
-                        sh """
-                            mkdir -p SKANIKO_OUT_FOLDER && cd SKANIKO_OUT_FOLDER
-                            tar -xvf SKANIKO_OUT_TAR
-                            """
-                    }
-                
+        }
 
-                    container('iq') {
-                        withVault([vaultSecrets: osg_secrets]) {
-                         sh """
-                             iqscan -r  $IQ IMAGE_OUT  \
-                            -a $IQ_READ_USR: SIQ_READ_PSW  \
-                            -s $IQ HOST   \
-                            -i $IMG       \
-                            --stage $IQ STAGE    \
-                            $KANIKO_OUT_FOLDER/* | tee $IQ IMAGE TRACE
-                        """
-                    }
-                }
-               }
-            } 
-                    stage('Aqua Scan') {
-                         steps {
-                            container('util') {
-                            sh """
-                                skopeo copy docker-archive: $KANIKO OUT TAR
-                                    oci-archive: SKANIKO_OCI_TAR
-                            """
+        stage("Wait for Sonar Result") {
+            steps {
+                timeout(time: 3, unit: 'MINUTES') {
+                    echo "Waiting for SonarQube result..."
+                    sleep 15
+                    script {
+                        def result = waitForQualityGate()
+                        if (result.status != 'OK') {
+                            error "Quality gate failed with result: ${result.status}"
+                        } else {
+                            echo "Quality gate passed with result: ${result.status}"
                         }
-                    container(aqua) {
-                        withVault([vaultSecrets: alf secrets]) {
-                        sh """
-                        /opt/aquasec/scannercli scan       \
-                            --dockerless      \
-                            --host $AQUA HOST  \
-                            --no-verify         \
-                            -user $AQUA READ_USR  \
-                            --password $AQUA READ_PSW  \
-                            oci-archive $KANIKO OCI TAR  \
-                            $ING:$TAG > $AQ IMAGE OUT  
-                            
-                        """
                     }
-                   }
                 }
             }
         }
-    } 
 
-        stage ('Scan Results') {
-                        steps {
-                        container('util') {
-                          withVault([vaultSecrets: alf secrets]) {
-                           script{                    
-                                def Iqappreport-sh(returnStdout: true, script: """echo $(jqr reportHtalUrl $IQ APP_OUT)""")
-                                    echo "IQ Image report: $iqappreport"
-                                def iqimagereport-sh(returnStdout: true, script:"""echo $(jar.reportHtmlUrl $IQ IMAGE_OUT)""")
-                                    echo "IQ Image report: $iqimagereport"
-                                    echo "AquaSec report: $AQUA SCAN$ING: $TAG"
+        stage("Image Build") {
+            environment {
+                PATH = "/kaniko"
+            }
+            steps {
+                container(name: 'kaniko', shell: '/busybox/sh') {
+                    sh '''
+                        /kaniko/executor --context `pwd` --verbosity info --no-push \
+                        --destination image --tarPath $KANIKO_OUT_TAR
+                    '''
+                }
+            }
+        }
 
-                        def igappresult=sh(returnStatus: true, script: "iq validate $IQ_APP_TRACE")
-                        if (iqappresult != 0) correntfuild.result = 'UNSTABLE'
-                        def inimageresult=sh(returnStatus: true, script: "iq_validate $IQ_IMAGE_TRACE")
-                        if (iqimageresult !=0) currentBuild.result UNSTABLE 
-                        def agresult=sh(returnStatus: true, script:"iq_validate_$AQ IMAGE OUT") 
-                        if (aqresult !=0) currentbuild.result= 'FAIL'
-
-        stage('Push to Staging Registry) {
-                    when { any of { branch 'master'; branch 'main'} }
+        stage("Security Scans") {
+            parallel {
+                stage("IQ App Scan") {
                     steps {
-                            container('util) {
-                            withVault([vaultSecrets: alf_secrets]) {
-                            sh """                           
-                            skepeo copy --dest --creds= $STAGING_UPDATE_USR: $STAGING_UPDATE_PSW \
-                                docker-archive:SKANIKO_OUT_TAR   \
-                            docker://$TAGING_REGISTRY/$ING: $TAG
-
-                            """
-                    }
-                }
-            }
-        }
-    }
-                     post {
-                           always {
-                                archiveArtifacts artifacts: env.IQ APP OUT, onlyIfSuccessful: false
-                                archiveArtifacts artifacts: env. IQ APP TRACE, onlyIfSuccessful: false
-                                archiveArtifacts artifacts: env.IQ IMAGE_OUT, onlyIfSuccessful: false
-                                archiveArtifacts artifacts: env. IQ IMAGE TRACE, onlyIfSuccessful: false
-                                archiveArtifacts artifacts: env.AQ IMAGE OUT, onlyIfSuccessful: false
+                        container('maven') {
+                            withVault([vaultSecrets: osg_secrets]) {
+                                sh '''
+                                    mvn -s project-settings.xml \
+                                    -Djavax.net.ssl.trustStore=cacerts \
+                                    -Dclm.resultFile=$IQ_APP_OUT \
+                                    -Dclm.username=$IQ_READ_USR \
+                                    -Dclm.password=$IQ_READ_PSW \
+                                    -Dclm.serverUrl=$IQ_HOST \
+                                    -Dclm.applicationId=$IMG \
+                                    com.sonatype.clm:clm-maven-plugin:evaluate \
+                                    | tee $IQ_APP_TRACE
+                                '''
                             }
                         }
                     }
+                }
 
+                stage("IQ Image Scan") {
+                    steps {
+                        container('util') {
+                            sh '''
+                                mkdir -p $KANIKO_OUT_FOLDER && cd $KANIKO_OUT_FOLDER
+                                tar -xvf $KANIKO_OUT_TAR
+                            '''
+                        }
 
+                        container('iq') {
+                            withVault([vaultSecrets: osg_secrets]) {
+                                sh '''
+                                    iqscan -r $IQ_IMAGE_OUT \
+                                    -a $IQ_READ_USR:$IQ_READ_PSW \
+                                    -s $IQ_HOST \
+                                    -i $IMG \
+                                    --stage $IQ_STAGE \
+                                    $KANIKO_OUT_FOLDER/* | tee $IQ_IMAGE_TRACE
+                                '''
+                            }
+                        }
+                    }
+                }
 
+                stage("Aqua Scan") {
+                    steps {
+                        container('util') {
+                            sh '''
+                                skopeo copy docker-archive:$KANIKO_OUT_TAR \
+                                oci-archive:$KANIKO_OCI_TAR
+                            '''
+                        }
 
+                        container('aqua') {
+                            withVault([vaultSecrets: alf_secrets]) {
+                                sh '''
+                                    /opt/aquasec/scannercli scan \
+                                    --dockerless \
+                                    --host $AQUA_HOST \
+                                    --no-verify \
+                                    --user $AQUA_READ_USR \
+                                    --password $AQUA_READ_PSW \
+                                    oci-archive:$KANIKO_OCI_TAR \
+                                    $IMG:$TAG > $AQ_IMAGE_OUT
+                                '''
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Scan Results") {
+            steps {
+                container('util') {
+                    withVault([vaultSecrets: alf_secrets]) {
+                        script {
+                            def iqAppReport = sh(returnStdout: true, script: "jqr reportHtmlUrl $IQ_APP_OUT").trim()
+                            def iqImageReport = sh(returnStdout: true, script: "jqr reportHtmlUrl $IQ_IMAGE_OUT").trim()
+                            echo "IQ App Report: $iqAppReport"
+                            echo "IQ Image Report: $iqImageReport"
+                            echo "AquaSec Report: ${AQUA_SCAN_URL}${IMG}:${TAG}"
+
+                            def iqAppResult = sh(returnStatus: true, script: "iq_validate $IQ_APP_TRACE")
+                            if (iqAppResult != 0) currentBuild.result = 'UNSTABLE'
+
+                            def iqImageResult = sh(returnStatus: true, script: "iq_validate $IQ_IMAGE_TRACE")
+                            if (iqImageResult != 0) currentBuild.result = 'UNSTABLE'
+
+                            def aqResult = sh(returnStatus: true, script: "iq_validate $AQ_IMAGE_OUT")
+                            if (aqResult != 0) currentBuild.result = 'FAILURE'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage("Push to Staging Registry") {
+            when {
+                anyOf {
+                    branch 'master'
+                    branch 'main'
+                }
+            }
+            steps {
+                container('util') {
+                    withVault([vaultSecrets: alf_secrets]) {
+                        sh '''
+                            skopeo copy --dest-creds=$STAGING_UPDATE_USR:$STAGING_UPDATE_PSW \
+                            docker-archive:$KANIKO_OUT_TAR \
+                            docker://$STAGING_REGISTRY/$IMG:$TAG
+                        '''
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: "${IQ_APP_OUT}", onlyIfSuccessful: false
+            archiveArtifacts artifacts: "${IQ_APP_TRACE}", onlyIfSuccessful: false
+            archiveArtifacts artifacts: "${IQ_IMAGE_OUT}", onlyIfSuccessful: false
+            archiveArtifacts artifacts: "${IQ_IMAGE_TRACE}", onlyIfSuccessful: false
+            archiveArtifacts artifacts: "${AQ_IMAGE_OUT}", onlyIfSuccessful: false
+        }
+    }
+}
