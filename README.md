@@ -1,8 +1,6 @@
 # JenkinsFile
 CI CD Code
 
-This Repository contains Jenkinsfile
-Stages to build CICD pipeline
-Stages consists of various steps from fetching code till deployment
+This repository contains a Jenkinsfile that defines the stages of our CI/CD pipeline, covering everything from fetching the code to deployment.
 
-You can suggest your changes for this repository and raise PR. I will reveiew and merge the same. Thanks
+We encourage you to review the pipeline and suggest any improvements or modifications you deem necessary. Once you’ve made your changes, please feel free to raise a Pull Request (PR). I will review the proposed changes and merge them accordingly.
