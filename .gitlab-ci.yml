@@ -47,6 +47,7 @@ build_prod:
   script:
   - docker build --no-cache -t "$REGISTRY/$REPO_DEV:$CI_BUILD_REF_NAME" .
   - docker push $REGISTRY/$REPO_DEV:$CI_BUILD_REF_NAME
+  when: manual
   
 
 deploy_dev:
